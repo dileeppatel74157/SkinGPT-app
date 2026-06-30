@@ -1,0 +1,6 @@
+{
+  "name": "SkinGPT Skin Analyzer",
+  "description": "An enterprise-grade, scientific AI skin analysis and personalized skincare routine platform, featuring real-time vision-based derm scans, compatibility engines, and an expert consultant.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

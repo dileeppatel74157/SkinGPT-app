@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, User, RefreshCw, HelpCircle } from 'lucide-react';
 import { ChatMessage, SkinScan } from '../types';
+import { useAuth } from '../hooks/useAuth';
 
 interface AiConsultantProps {
   latestReport: SkinScan | null;
@@ -10,6 +11,7 @@ interface AiConsultantProps {
 }
 
 export default function AiConsultant({ latestReport, chatMessages, onChatMessagesChanged, geminiApiKey }: AiConsultantProps) {
+  const { idToken } = useAuth();
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -51,6 +53,9 @@ export default function AiConsultant({ latestReport, chatMessages, onChatMessage
       };
       if (geminiApiKey && geminiApiKey.trim()) {
         headers['x-gemini-key'] = geminiApiKey.trim();
+      }
+      if (idToken) {
+        headers['Authorization'] = `Bearer ${idToken}`;
       }
 
       const response = await fetch('/api/chat', {

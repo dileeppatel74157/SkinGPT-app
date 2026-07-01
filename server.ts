@@ -4,6 +4,166 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import compression from 'compression';
+import admin from 'firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import { PRODUCTS_DATABASE } from './src/data/products';
+
+
+
+// Initialize Firebase Admin SDK using Project ID
+admin.initializeApp({
+  projectId: process.env.FIREBASE_PROJECT_ID || 'gen-lang-client-0336297688'
+});
+
+interface AuthenticatedRequest extends express.Request {
+  user?: {
+    uid: string;
+    email?: string;
+  };
+}
+
+const verifyFirebaseToken = async (
+  req: AuthenticatedRequest,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or malformed Authorization header.' });
+  }
+
+  const idToken = authHeader.split('Bearer ')[1];
+
+  try {
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    req.user = {
+      uid: decodedToken.uid,
+      email: decodedToken.email
+    };
+    next();
+  } catch (error: any) {
+    console.error('Error verifying Firebase ID token:', error);
+    return res.status(401).json({ error: 'Unauthorized: Invalid or expired token.' });
+  }
+};
+
+const getAvailableProducts = async () => {
+  const firestoreDb = getFirestore();
+  const snapshot = await firestoreDb.collection('products').get();
+  if (snapshot.empty) {
+    console.log('Seeding products database on backend...');
+    const batch = firestoreDb.batch();
+    for (const p of PRODUCTS_DATABASE) {
+      const docRef = firestoreDb.collection('products').doc(p.id);
+      batch.set(docRef, p);
+    }
+    await batch.commit();
+    return PRODUCTS_DATABASE;
+  }
+  return snapshot.docs.map(doc => doc.data());
+};
+
+const getUserData = async (uid: string) => {
+  const firestoreDb = getFirestore();
+  const userRef = firestoreDb.collection('users').doc(uid);
+  const docSnap = await userRef.get();
+  if (docSnap.exists) {
+    return docSnap.data();
+  }
+  return null;
+};
+
+const incrementUsage = async (uid: string, type: 'scan' | 'chat') => {
+  const firestoreDb = getFirestore();
+  const userRef = firestoreDb.collection('users').doc(uid);
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  try {
+    await firestoreDb.runTransaction(async (transaction) => {
+      const docSnap = await transaction.get(userRef);
+      const data = docSnap.exists ? (docSnap.data() || {}) : {};
+      
+      const usage = data.usage || {
+        totalScans: 0,
+        scansToday: 0,
+        chatMessages: 0,
+        lastScanDate: '',
+        storageUsed: 0,
+        chatsToday: 0,
+        lastChatDate: ''
+      };
+      
+      const subscription = data.subscription || {
+        plan: 'Free',
+        status: 'active',
+        scansRemaining: 5,
+        expiresAt: ''
+      };
+
+      if (type === 'scan') {
+        usage.totalScans = (usage.totalScans || 0) + 1;
+        if (usage.lastScanDate === todayStr) {
+          usage.scansToday = (usage.scansToday || 0) + 1;
+        } else {
+          usage.scansToday = 1;
+          usage.lastScanDate = todayStr;
+        }
+        if (subscription.scansRemaining > 0) {
+          subscription.scansRemaining = subscription.scansRemaining - 1;
+        }
+      } else if (type === 'chat') {
+        usage.chatMessages = (usage.chatMessages || 0) + 1;
+        if (usage.lastChatDate === todayStr) {
+          usage.chatsToday = (usage.chatsToday || 0) + 1;
+        } else {
+          usage.chatsToday = 1;
+          usage.lastChatDate = todayStr;
+        }
+      }
+
+      transaction.set(userRef, { usage, subscription }, { merge: true });
+    });
+  } catch (error) {
+    console.error('Error incrementing usage in transaction:', error);
+  }
+};
+
+const checkRateLimit = (type: 'scan' | 'chat') => {
+  return async (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
+    if (!req.user?.uid) {
+      return res.status(401).json({ error: 'Unauthorized: Missing user credentials.' });
+    }
+
+    const uid = req.user.uid;
+    try {
+      const userData = await getUserData(uid);
+      const usage = userData?.usage || {};
+      const subscription = userData?.subscription || { plan: 'Free' };
+
+      if (subscription.plan === 'Free') {
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        if (type === 'scan') {
+          const scansToday = usage.lastScanDate === todayStr ? (usage.scansToday || 0) : 0;
+          if (scansToday >= 5) {
+            return res.status(429).json({ error: 'Rate limit exceeded: Free tier accounts are restricted to 5 scans per day.' });
+          }
+        } else if (type === 'chat') {
+          const chatsToday = usage.lastChatDate === todayStr ? (usage.chatsToday || 0) : 0;
+          if (chatsToday >= 20) {
+            return res.status(429).json({ error: 'Rate limit exceeded: Free tier accounts are restricted to 20 chats per day.' });
+          }
+        }
+      }
+      next();
+    } catch (err) {
+      console.error('Error in checkRateLimit middleware:', err);
+      next(); // Fail-open
+    }
+  };
+};
+
 
 dotenv.config();
 
@@ -133,7 +293,7 @@ async function startServer() {
   };
 
   // 1. AI Skin Analysis Endpoint
-  app.post(['/api/analyze', '/api/analyze-skin'], async (req, res) => {
+  app.post(['/api/analyze', '/api/analyze-skin'], verifyFirebaseToken as any, checkRateLimit('scan') as any, async (req: any, res) => {
     try {
       const { image } = req.body;
       if (!image) {
@@ -149,6 +309,8 @@ async function startServer() {
         }
       };
 
+      const availableProducts = await getAvailableProducts();
+
       const systemInstruction = `You are an elite, board-certified dermatological AI assistant.
 Your task is to analyze the provided close-up face/skin photo and generate a highly detailed, personalized, and scientific skin analysis report in JSON format.
 Follow these crucial guidelines:
@@ -159,8 +321,11 @@ Follow these crucial guidelines:
 5. Identify specific skin concerns (e.g., "Active inflammatory acne", "Dehydration lines", "Congested pores", "Erythema on cheeks", "Mild hyperpigmentation").
 6. Provide qualitative scientific descriptions of: redness, pores, wrinkles, oiliness, dryness, acne, and pigmentation.
 7. Recommend a highly optimized, custom Morning and Evening skincare routine.
-8. Recommend 3 highly effective products with Budget, Mid-range, and Premium tiers. Include specific active ingredients (e.g., Niacinamide, Salicylic Acid, Ceramides) and explain exactly why they were recommended.
-9. Always output educational, supportive, transparent explanations. Emphasize that this is an educational AI assessment and NOT a medical diagnosis.`;
+8. Recommend 3 highly effective products from the database below with Budget, Mid-range, and Premium tiers. You MUST ONLY recommend products from the provided database. Do not invent products. For each recommended product, copy the brand, name, category, and active ingredients exactly from the database, explain exactly why it fits the user's skin findings in "reason", and estimate the expectedTimeline and confidenceScore.
+9. Always output educational, supportive, transparent explanations. Emphasize that this is an educational AI assessment and NOT a medical diagnosis.
+
+DATABASE OF AVAILABLE PRODUCTS:
+${JSON.stringify(availableProducts)}`;
 
       const responseSchema = {
         type: Type.OBJECT,
@@ -287,6 +452,7 @@ Follow these crucial guidelines:
           error: 'Gemini returned invalid JSON.'
         });
       }
+      await incrementUsage(req.user.uid, 'scan');
       res.json(parsedData);
     } catch (error: any) {
       console.error('Analysis error:', error);
@@ -297,7 +463,7 @@ Follow these crucial guidelines:
   });
 
   // 2. AI Skincare Consultant Chat Endpoint
-  app.post('/api/chat', async (req, res) => {
+  app.post('/api/chat', verifyFirebaseToken as any, checkRateLimit('chat') as any, async (req: any, res) => {
     try {
       const { messages, currentReport } = req.body;
       if (!messages || !Array.isArray(messages)) {
@@ -353,6 +519,7 @@ Provide highly personalized answers referencing their skin profile naturally whe
         }
       });
 
+      await incrementUsage(req.user.uid, 'chat');
       res.json({ text: response.text });
     } catch (error: any) {
       console.error('Chat error:', error);

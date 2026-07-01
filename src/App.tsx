@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Calendar, Layers, BookOpen, MessageSquare, TrendingUp, Bell, Heart, Menu, X, Check, HelpCircle, User, Sun, Moon, Folder } from 'lucide-react';
+import { Sparkles, Calendar, Layers, BookOpen, MessageSquare, TrendingUp, Bell, Heart, Menu, X, Check, HelpCircle, User, Sun, Moon, Folder, LogOut, RefreshCw } from 'lucide-react';
 import { SkinScan, CabinetItem, ChatMessage, UserProfile } from './types';
 import Dashboard from './components/Dashboard';
 import SkinScanner from './components/SkinScanner';
@@ -11,9 +11,29 @@ import UserProfileSettings from './components/UserProfileSettings';
 import UserGuide from './components/UserGuide';
 import Testimonials from './components/Testimonials';
 import GoogleDrive from './components/GoogleDrive';
+import { useAuth } from './hooks/useAuth';
+import LandingAuth from './pages/LandingAuth';
+import { 
+  getUserProfile, 
+  updateUserProfile, 
+  saveScan, 
+  getScans, 
+  addCabinetItem, 
+  updateCabinetItem, 
+  deleteCabinetItem, 
+  getCabinetItems, 
+  createChat, 
+  appendMessage, 
+  loadChats, 
+  deleteChat 
+} from './services/dbService';
+
+
 
 export default function App() {
+  const { user, loading, logout } = useAuth();
   const [currentTab, setCurrentTab] = useState('dashboard');
+
   const [importedImage, setImportedImage] = useState<string | null>(null);
   const [latestReport, setLatestReport] = useState<SkinScan | null>(null);
   const [cabinetItems, setCabinetItems] = useState<CabinetItem[]>([]);
@@ -49,49 +69,124 @@ export default function App() {
     }
   }, [darkMode]);
 
-  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
-    try {
-      const stored = localStorage.getItem('skingpt_user_profile') || localStorage.getItem('aura_user_profile');
-      if (stored) return JSON.parse(stored);
-    } catch (e) {
-      console.error("Error parsing profile from localStorage:", e);
-    }
-    return {
-      name: 'Dileep Patel',
-      email: 'dileeppatel74157@gmail.com',
-      age: 26,
-      location: 'San Francisco, CA',
-      climate: 'Temperate',
-      skinType: 'Normal',
-      concerns: [],
-      geminiApiKey: '',
-      openuvApiKey: ''
-    };
+  const [userProfile, setUserProfile] = useState<UserProfile>({
+    name: 'Guest User',
+    email: '',
+    age: 26,
+    location: 'San Francisco, CA',
+    climate: 'Temperate',
+    skinType: 'Normal',
+    concerns: [],
+    geminiApiKey: '',
+    openuvApiKey: ''
   });
 
-  const handleProfileChanged = (updated: UserProfile) => {
+  const handleProfileChanged = async (updated: UserProfile) => {
     setUserProfile(updated);
-    localStorage.setItem('skingpt_user_profile', JSON.stringify(updated));
+    if (user) {
+      try {
+        await updateUserProfile(user.uid, updated);
+      } catch (err) {
+        console.error("Error updating profile in Firestore:", err);
+      }
+    }
   };
+
+  // Sync user profile from Firestore on auth state loaded
+  useEffect(() => {
+    if (!user) return;
+
+    const syncUserProfile = async () => {
+      try {
+        const profile = await getUserProfile(user.uid);
+        if (profile) {
+          setUserProfile(profile as UserProfile);
+        } else {
+          // Check if there is a temp profile from signup
+          const tempStored = localStorage.getItem('skingpt_signup_temp_profile');
+          let newProfile: UserProfile;
+          if (tempStored) {
+            newProfile = JSON.parse(tempStored);
+            localStorage.removeItem('skingpt_signup_temp_profile');
+          } else {
+            newProfile = {
+              name: user.displayName || 'Google User',
+              email: user.email || '',
+              age: 26,
+              location: 'San Francisco, CA',
+              climate: 'Temperate',
+              skinType: 'Normal',
+              concerns: [],
+              geminiApiKey: '',
+              openuvApiKey: ''
+            };
+          }
+          // Add SaaS fields
+          newProfile.uid = user.uid;
+          newProfile.displayName = user.displayName || newProfile.name;
+          newProfile.photoURL = user.photoURL || '';
+          newProfile.createdAt = new Date().toISOString();
+          newProfile.country = 'US';
+          newProfile.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          
+          await updateUserProfile(user.uid, newProfile);
+          setUserProfile(newProfile);
+        }
+      } catch (err) {
+        console.error("Error syncing user profile:", err);
+      }
+    };
+
+    syncUserProfile();
+  }, [user]);
+
+  // Sync scan history from Firestore
+  useEffect(() => {
+    if (!user) {
+      setHistoryScans([]);
+      setLatestReport(null);
+      return;
+    }
+
+    const loadUserScans = async () => {
+      try {
+        const scans = await getScans(user.uid);
+        if (scans && scans.length > 0) {
+          setHistoryScans(scans);
+          setLatestReport(scans[0]);
+        } else {
+          setHistoryScans([]);
+          setLatestReport(null);
+        }
+      } catch (err) {
+        console.error("Error loading scans from Firestore:", err);
+      }
+    };
+
+    loadUserScans();
+  }, [user]);
+
+  // Sync cabinet items from Firestore
+  useEffect(() => {
+    if (!user) {
+      setCabinetItems([]);
+      return;
+    }
+
+    const loadUserCabinet = async () => {
+      try {
+        const items = await getCabinetItems(user.uid);
+        setCabinetItems(items);
+      } catch (err) {
+        console.error("Error loading cabinet items from Firestore:", err);
+      }
+    };
+
+    loadUserCabinet();
+  }, [user]);
 
   // Load from localStorage on startup
   useEffect(() => {
-    try {
-      const storedReport = localStorage.getItem('skingpt_latest_report') || localStorage.getItem('aura_latest_report');
-      if (storedReport) {
-        const parsed = JSON.parse(storedReport);
-        setLatestReport(parsed);
-        setHistoryScans([parsed]);
-      }
-
-      const storedCabinet = localStorage.getItem('skingpt_cabinet_items') || localStorage.getItem('aura_cabinet_items');
-      if (storedCabinet) {
-        setCabinetItems(JSON.parse(storedCabinet));
-      }
-    } catch (e) {
-      console.error("Error reading localStorage:", e);
-    }
-
     // Initialize Chat with friendly greeting
     setChatMessages([
       {
@@ -103,11 +198,17 @@ export default function App() {
     ]);
   }, []);
 
-  // Save latest report to localStorage
-  const handleScanCompleted = (report: SkinScan) => {
+  // Save latest report to Firestore
+  const handleScanCompleted = async (report: SkinScan) => {
     setLatestReport(report);
     setHistoryScans(prev => [report, ...prev]);
-    localStorage.setItem('skingpt_latest_report', JSON.stringify(report));
+    if (user) {
+      try {
+        await saveScan(user.uid, report);
+      } catch (err) {
+        console.error("Error saving scan to Firestore:", err);
+      }
+    }
     
     // Add custom notification
     setNotifications(prev => [
@@ -119,16 +220,120 @@ export default function App() {
     setCurrentTab('dashboard');
   };
 
-  // Save cabinet to localStorage
-  const handleCabinetChanged = (updatedItems: CabinetItem[]) => {
+  // Sync cabinet changes to Firestore
+  const handleCabinetChanged = async (updatedItems: CabinetItem[]) => {
+    const previousItems = cabinetItems;
     setCabinetItems(updatedItems);
-    localStorage.setItem('skingpt_cabinet_items', JSON.stringify(updatedItems));
+    
+    if (!user) return;
+    try {
+      // Find deleted items
+      const deleted = previousItems.filter(p => !updatedItems.find(u => u.id === p.id));
+      for (const item of deleted) {
+        await deleteCabinetItem(user.uid, item.id);
+      }
+
+      // Find added or modified items
+      for (const item of updatedItems) {
+        const prev = previousItems.find(p => p.id === item.id);
+        if (!prev) {
+          await addCabinetItem(user.uid, item);
+        } else if (JSON.stringify(prev) !== JSON.stringify(item)) {
+          await updateCabinetItem(user.uid, item.id, item);
+        }
+      }
+    } catch (err) {
+      console.error("Error updating cabinet in Firestore:", err);
+    }
+  };
+
+  // Sync chat messages from Firestore
+  useEffect(() => {
+    if (!user) {
+      setChatMessages([
+        {
+          id: 'initial',
+          role: 'model',
+          text: "Hello! I am SkinGPT, your private AI Skincare Coach and Cosmetic Chemist. If you have completed a facial analysis scan, I am already updated on your primary skin type, scores, and active concerns. Ask me any question about ingredient pairings, formulation pH ranges, or how to lay out your custom morning and evening routine!",
+          timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+      return;
+    }
+
+    const syncChatHistory = async () => {
+      try {
+        const threads = await loadChats(user.uid);
+        const defaultThread = threads.find(t => t.id === 'default');
+        if (defaultThread && defaultThread.messages.length > 0) {
+          setChatMessages(defaultThread.messages);
+        } else {
+          // Initialize default thread doc
+          await createChat(user.uid, 'default', 'AI Skincare Consultation');
+          const initialMsg = {
+            id: 'initial',
+            role: 'model' as const,
+            text: "Hello! I am SkinGPT, your private AI Skincare Coach and Cosmetic Chemist. If you have completed a facial analysis scan, I am already updated on your primary skin type, scores, and active concerns. Ask me any question about ingredient pairings, formulation pH ranges, or how to lay out your custom morning and evening routine!",
+            timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+          };
+          await appendMessage(user.uid, 'default', initialMsg);
+          setChatMessages([initialMsg]);
+        }
+      } catch (err) {
+        console.error("Error loading chat history from Firestore:", err);
+      }
+    };
+
+    syncChatHistory();
+  }, [user]);
+
+  const handleChatMessagesChanged = async (updatedMessages: ChatMessage[]) => {
+    const previousMessages = chatMessages;
+    setChatMessages(updatedMessages);
+
+    if (!user) return;
+
+    try {
+      // Find the new messages that were appended
+      const newMessages = updatedMessages.filter(m => !previousMessages.find(p => p.id === m.id));
+      for (const msg of newMessages) {
+        await appendMessage(user.uid, 'default', msg);
+      }
+      
+      // If the chat was cleared (i.e. updatedMessages only contains the initial message)
+      if (updatedMessages.length === 1 && updatedMessages[0].id === 'initial' && previousMessages.length > 1) {
+        await deleteChat(user.uid, 'default');
+        await createChat(user.uid, 'default', 'AI Skincare Consultation');
+        await appendMessage(user.uid, 'default', updatedMessages[0]);
+      }
+    } catch (err) {
+      console.error("Error saving chat message to Firestore:", err);
+    }
   };
 
   const handleNavigate = (tab: string) => {
     setCurrentTab(tab);
     setMobileMenuOpen(false);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white font-sans">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="h-8 w-8 text-indigo-500 animate-spin" />
+          <p className="text-xs text-slate-450 tracking-wider font-mono animate-pulse">LOADING SESSION...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LandingAuth />;
+  }
+
+  if (!user.emailVerified && user.providerData[0]?.providerId === 'password') {
+    return <LandingAuth initialView="verify" />;
+  }
 
   return (
     <div className="min-h-screen bg-brand-50/20 dark:bg-slate-950 flex flex-col font-sans transition-colors duration-200" id="applet-core-shell">
@@ -252,6 +457,18 @@ export default function App() {
               </div>
             </button>
 
+            {/* Sign Out Button */}
+            <button
+              onClick={logout}
+              className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-450 hover:bg-rose-50/10 dark:hover:bg-rose-950/20 rounded-xl transition-colors cursor-pointer text-xs font-bold flex items-center gap-1.5 border-l border-brand-200/60 dark:border-slate-800 pl-3"
+              title="Sign Out"
+              id="sign-out-header-btn"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </button>
+
+
             {/* Mobile menu trigger */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -344,7 +561,7 @@ export default function App() {
           <AiConsultant
             latestReport={latestReport}
             chatMessages={chatMessages}
-            onChatMessagesChanged={setChatMessages}
+            onChatMessagesChanged={handleChatMessagesChanged}
             geminiApiKey={userProfile.geminiApiKey}
           />
         )}

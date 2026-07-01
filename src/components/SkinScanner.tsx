@@ -1,6 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Camera, Upload, CheckCircle2, AlertTriangle, Sparkles, RefreshCw, Eye, Flame, Shield, Droplets, Smile, HelpCircle } from 'lucide-react';
 import { SkinScan } from '../types';
+import { useAuth } from '../hooks/useAuth';
+import { uploadScanImage } from '../services/storageService';
+
 
 interface SkinScannerProps {
   onScanCompleted: (report: SkinScan) => void;
@@ -15,6 +18,7 @@ export default function SkinScanner({
   importedImage,
   onClearImportedImage
 }: SkinScannerProps) {
+  const { user, idToken } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -156,12 +160,27 @@ export default function SkinScanner({
   };
 
   const triggerServerAnalysis = async () => {
+    if (!imagePreview) return;
     try {
+      const scanId = `scan-${Date.now()}`;
+      let downloadURL = imagePreview;
+      let storagePath = '';
+
+      if (user) {
+        setPhaseLog(prev => [...prev, "Uploading diagnostic imagery to secure cloud..."]);
+        const uploadResult = await uploadScanImage(user.uid, scanId, imagePreview);
+        downloadURL = uploadResult.downloadURL;
+        storagePath = uploadResult.storagePath;
+      }
+
+      setPhaseLog(prev => [...prev, "Contacting clinical generative analysis engine..."]);
+
       // Send image to back-end proxy to keep API keys safe!
       const response = await fetch('/api/analyze-skin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': idToken ? `Bearer ${idToken}` : '',
         },
         body: JSON.stringify({
           image: imagePreview,
@@ -175,7 +194,16 @@ export default function SkinScanner({
       }
 
       const report: SkinScan = await response.json();
-      onScanCompleted(report);
+      
+      // Inject scanId, storage info, and the final cloud imageURL into the report
+      const completedReport: SkinScan = {
+        ...report,
+        id: scanId,
+        imageUrl: downloadURL,
+        storagePath: storagePath
+      };
+
+      onScanCompleted(completedReport);
       setScanStatus('completed');
     } catch (err: any) {
       console.error("Analysis server route failed:", err);

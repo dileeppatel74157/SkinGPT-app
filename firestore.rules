@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if request is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user owns the document path
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Match users documents (profile, settings, usage, subscription, etc.)
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      // Match user scans subcollection
+      match /scans/{scanId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Match user cabinet subcollection
+      match /cabinet/{itemId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Match user chats subcollection
+      match /chats/{chatId} {
+        allow read, write: if isOwner(userId);
+        
+        // Match user chats messages subcollection
+        match /messages/{messageId} {
+          allow read, write: if isOwner(userId);
+        }
+      }
+    }
+
+    // Match global products collection
+    match /products/{productId} {
+      // Products are public read for authenticated SaaS users, write only by admins (disabled here)
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+  }
+}

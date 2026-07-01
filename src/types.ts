@@ -51,6 +51,8 @@ export interface SkinScan {
     evening: RoutineStep[];
   };
   recommendations: RecommendedProduct[];
+  storagePath?: string;
+  timestamp?: string;
 }
 
 export interface CabinetItem {
@@ -114,5 +116,12 @@ export interface UserProfile {
   concerns: string[];
   geminiApiKey: string;
   openuvApiKey: string;
+  uid?: string;
+  displayName?: string;
+  photoURL?: string;
+  country?: string;
+  timezone?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 

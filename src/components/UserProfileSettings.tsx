@@ -419,7 +419,7 @@ export default function UserProfileSettings({ latestReport, onProfileChanged, cu
               <ShieldCheck className="h-4 w-5 text-indigo-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-bold text-indigo-900 dark:text-indigo-200">Security Guarantee</p>
-                <p className="mt-0.5 text-indigo-700 dark:text-indigo-400">All custom API keys are loaded locally inside your browser's private storage (localStorage) and never uploaded or stored permanently on any third-party databases.</p>
+                <p className="mt-0.5 text-indigo-700 dark:text-indigo-400">All custom API keys are loaded securely inside your private cloud profile (Firestore) and never shared or stored on unencrypted public channels.</p>
               </div>
             </div>
 

@@ -88,12 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = async () => {
     setLoading(true);
     try {
-      const result = await googleSignIn();
-      if (result) {
-        setUser(result);
-        const token = await result.getIdToken();
-        setIdToken(token);
-      }
+      await googleSignIn();
     } catch (e) {
       setLoading(false);
       throw e;

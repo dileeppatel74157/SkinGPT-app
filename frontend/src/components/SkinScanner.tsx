@@ -2,8 +2,18 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Camera, Upload, CheckCircle2, AlertTriangle, Sparkles, RefreshCw, Eye, Flame, Shield, Droplets, Smile, HelpCircle } from 'lucide-react';
 import { SkinScan } from '../types';
 import { useAuth } from '../hooks/useAuth';
-import { uploadScanImage } from '../services/storageService';
 
+function dataURLtoFile(dataurl: string, filename: string): File {
+  const arr = dataurl.split(',');
+  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+}
 
 interface SkinScannerProps {
   onScanCompleted: (report: SkinScan) => void;
@@ -28,11 +38,10 @@ export default function SkinScanner({
   const streamRef = useRef<MediaStream | null>(null);
 
   const phases = [
-    { name: "Verifying Lighting Normalization", detail: "Checking for balanced color temperature and glare..." },
-    { name: "Performing Facial Alignment", detail: "Locating forehead, cheek zones, chin, and nose bridge..." },
-    { name: "Skin Layer Segmentation", detail: "Analyzing epidermal surface texture and dermis layers..." },
-    { name: "Feature Extraction & Anomaly Detection", detail: "Scanning for active acne, sebum blockages, and erythema..." },
-    { name: "Orchestrating Generative AI Report", detail: "Structuring skin diagnosis with clinical explanations..." }
+    { id: 'alignment', name: 'Facial landmarks mapping established', detail: 'Locating forehead, cheek zones, chin, and nose bridge...' },
+    { id: 'dermal', name: 'Multi-spectral dermal scan executed', detail: 'Analyzing epidermal surface texture and dermis layers...' },
+    { id: 'chroma', name: 'Erythema & chromophore distribution maps isolated', detail: 'Scanning for active acne, sebum blockages, and erythema...' },
+    { id: 'metrics', name: 'Calculating hydration index & sebum metric outputs', detail: 'Structuring skin diagnosis with clinical explanations...' }
   ];
 
   // Stop camera stream when component unmounts
@@ -152,28 +161,24 @@ export default function SkinScanner({
 
     try {
       const scanId = `scan-${Date.now()}`;
-      let downloadURL = imagePreview;
-      let storagePath = '';
-
-      if (user) {
-        setPhaseLog(prev => [...prev, "Uploading diagnostic imagery to secure cloud..."]);
-        const uploadResult = await uploadScanImage(user.uid, scanId, imagePreview);
-        downloadURL = uploadResult.downloadURL;
-        storagePath = uploadResult.storagePath;
-      }
-
+      
       setPhaseLog(prev => [...prev, "Contacting clinical generative analysis engine..."]);
 
-      // Send image to back-end proxy to keep API keys safe!
-      const response = await fetch('/api/analyze-skin', {
+      const formData = new FormData();
+      if (file) {
+        formData.append("image", file);
+      } else {
+        const capturedFile = dataURLtoFile(imagePreview, 'capture.jpg');
+        formData.append("image", capturedFile);
+      }
+
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${apiUrl}/api/analyze-skin`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': idToken ? `Bearer ${idToken}` : '',
         },
-        body: JSON.stringify({
-          image: imagePreview
-        }),
+        body: formData,
         signal: controller.signal
       });
 
@@ -186,12 +191,11 @@ export default function SkinScanner({
 
       const report: SkinScan = await response.json();
       
-      // Inject scanId, storage info, and the final cloud imageURL into the report
+      // Inject scanId and the local preview image URL into the report
       const completedReport: SkinScan = {
         ...report,
         id: scanId,
-        imageUrl: downloadURL,
-        storagePath: storagePath
+        imageUrl: imagePreview
       };
 
       onScanCompleted(completedReport);

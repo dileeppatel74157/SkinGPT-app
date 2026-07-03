@@ -23,17 +23,15 @@ export function validateGeminiConfig(req: Request, res: Response, next: NextFunc
  * Validates skin scanner analyze request payload
  */
 export function validateSkinScanPayload(req: Request, res: Response, next: NextFunction) {
-  const { image } = req.body;
-  if (!image) {
+  if (!req.file) {
     return res.status(400).json({
-      error: 'Image is required for skin analysis.'
+      error: 'Image file is required for skin analysis.'
     });
   }
   
-  // Validate basic base64 data string format or URL length
-  if (typeof image !== 'string' || image.length < 50) {
+  if (!req.file.buffer || req.file.size === 0) {
     return res.status(400).json({
-      error: 'Invalid image format provided.'
+      error: 'Uploaded image file is empty or corrupt.'
     });
   }
 

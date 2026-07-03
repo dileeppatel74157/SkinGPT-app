@@ -1,5 +1,5 @@
 import { getFirestore } from 'firebase-admin/firestore';
-import { PRODUCTS_DATABASE } from '../../src/data/products';
+import { PRODUCTS_DATABASE } from '../data/products';
 
 /**
  * Returns available products from Firestore database (seeds them if empty)

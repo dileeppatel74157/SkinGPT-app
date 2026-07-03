@@ -114,7 +114,6 @@ export interface UserProfile {
   climate: 'Temperate' | 'Dry/Cold' | 'Warm/Humid';
   skinType: 'Oily' | 'Dry' | 'Combination' | 'Sensitive' | 'Normal';
   concerns: string[];
-  geminiApiKey: string;
   openuvApiKey: string;
   uid?: string;
   displayName?: string;

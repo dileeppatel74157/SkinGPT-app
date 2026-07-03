@@ -7,16 +7,10 @@ import { uploadScanImage } from '../services/storageService';
 
 interface SkinScannerProps {
   onScanCompleted: (report: SkinScan) => void;
-  geminiApiKey: string;
-  importedImage?: string | null;
-  onClearImportedImage?: () => void;
 }
 
 export default function SkinScanner({ 
-  onScanCompleted, 
-  geminiApiKey,
-  importedImage,
-  onClearImportedImage
+  onScanCompleted
 }: SkinScannerProps) {
   const { user, idToken } = useAuth();
   const [file, setFile] = useState<File | null>(null);
@@ -48,18 +42,7 @@ export default function SkinScanner({
     };
   }, []);
 
-  // Handle imported image from Google Drive
-  useEffect(() => {
-    if (importedImage) {
-      setImagePreview(importedImage);
-      setFile(null);
-      stopCamera();
-      setScanStatus('idle');
-      if (onClearImportedImage) {
-        onClearImportedImage();
-      }
-    }
-  }, [importedImage]);
+
 
   // Run through scanning phases sequentially to mimic a clinical scanner
   useEffect(() => {
@@ -161,6 +144,12 @@ export default function SkinScanner({
 
   const triggerServerAnalysis = async () => {
     if (!imagePreview) return;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 30000); // 30 seconds client-side timeout
+
     try {
       const scanId = `scan-${Date.now()}`;
       let downloadURL = imagePreview;
@@ -183,10 +172,12 @@ export default function SkinScanner({
           'Authorization': idToken ? `Bearer ${idToken}` : '',
         },
         body: JSON.stringify({
-          image: imagePreview,
-          customApiKey: geminiApiKey || undefined
+          image: imagePreview
         }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -206,8 +197,13 @@ export default function SkinScanner({
       onScanCompleted(completedReport);
       setScanStatus('completed');
     } catch (err: any) {
+      clearTimeout(timeoutId);
       console.error("Analysis server route failed:", err);
-      setError(err.message || "An unexpected error occurred during the facial scan. Please retry with a clearer image.");
+      if (err.name === 'AbortError') {
+        setError("The skin analysis request timed out (30 seconds limit reached). Please check your internet connection or API settings and try again.");
+      } else {
+        setError(err.message || "An unexpected error occurred during the facial scan. Please retry with a clearer image.");
+      }
       setScanStatus('idle');
       setAnalysisPhase(0);
       setPhaseLog([]);

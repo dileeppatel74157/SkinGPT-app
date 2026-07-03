@@ -95,7 +95,6 @@ export default function LandingAuth({ initialView = 'landing' }: LandingAuthProp
         climate: signupClimate,
         skinType: signupSkinType,
         concerns: signupConcerns,
-        geminiApiKey: '',
         openuvApiKey: ''
       };
       localStorage.setItem('skingpt_signup_temp_profile', JSON.stringify(signupProfile));
@@ -326,7 +325,7 @@ export default function LandingAuth({ initialView = 'landing' }: LandingAuthProp
                   onClick={() => setView('signup')}
                   className="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs font-semibold tracking-wider transition-all shadow-md cursor-pointer"
                 >
-                  GET STARTED FOR FREE
+                  Get Started for Free
                 </button>
               </div>
             </div>
@@ -400,7 +399,7 @@ export default function LandingAuth({ initialView = 'landing' }: LandingAuthProp
                 {status === 'loading' ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />
                 ) : (
-                  "SIGN IN"
+                  "Sign In"
                 )}
               </button>
             </form>
@@ -419,7 +418,7 @@ export default function LandingAuth({ initialView = 'landing' }: LandingAuthProp
               <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.579-7.859-8s3.529-8 7.859-8c2.46 0 4.105 1.025 5.047 1.926l3.227-3.107C18.232 1.95 15.485.8 12.24.8 6.035.8 1 5.835 1 12.04s5.035 11.24 11.24 11.24c6.478 0 10.793-4.537 10.793-10.985 0-.74-.08-1.305-.178-1.865h-10.615z" />
               </svg>
-              Google Account
+              Continue with Google
             </button>
 
             <div className="text-center">
@@ -438,8 +437,8 @@ export default function LandingAuth({ initialView = 'landing' }: LandingAuthProp
         {view === 'signup' && (
           <div className="w-full max-w-2xl bg-slate-900/50 border border-slate-800 p-8 rounded-3xl backdrop-blur-xl shadow-2xl space-y-6">
             <div className="text-center space-y-1.5">
-              <h2 className="text-2xl font-bold font-display text-white">Create SaaS Account</h2>
-              <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider text-indigo-400">Begin your clinical skin-tracking dashboard</p>
+              <h2 className="text-2xl font-bold font-display text-white">Create Account</h2>
+              <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider text-indigo-400">Start your personalized AI skin analysis journey.</p>
             </div>
 
             {errorMsg && (
@@ -603,7 +602,7 @@ export default function LandingAuth({ initialView = 'landing' }: LandingAuthProp
                     {status === 'loading' ? (
                       <RefreshCw className="h-4 w-4 animate-spin" />
                     ) : (
-                      "CREATE SAAS ACCOUNT"
+                      "Create Account"
                     )}
                   </button>
                 </div>
@@ -624,7 +623,7 @@ export default function LandingAuth({ initialView = 'landing' }: LandingAuthProp
               <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.579-7.859-8s3.529-8 7.859-8c2.46 0 4.105 1.025 5.047 1.926l3.227-3.107C18.232 1.95 15.485.8 12.24.8 6.035.8 1 5.835 1 12.04s5.035 11.24 11.24 11.24c6.478 0 10.793-4.537 10.793-10.985 0-.74-.08-1.305-.178-1.865h-10.615z" />
               </svg>
-              Google Account
+              Continue with Google
             </button>
 
             <div className="text-center pt-2">
@@ -698,7 +697,7 @@ export default function LandingAuth({ initialView = 'landing' }: LandingAuthProp
                   {status === 'loading' ? (
                     <RefreshCw className="h-4 w-4 animate-spin" />
                   ) : (
-                    "DISPATCH RECOVERY EMAIL"
+                    "Send Recovery Email"
                   )}
                 </button>
               </form>
@@ -745,7 +744,7 @@ export default function LandingAuth({ initialView = 'landing' }: LandingAuthProp
                 {status === 'loading' ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />
                 ) : (
-                  "I HAVE VERIFIED MY EMAIL"
+                  "I Have Verified My Email"
                 )}
               </button>
 
@@ -792,7 +791,7 @@ export default function LandingAuth({ initialView = 'landing' }: LandingAuthProp
 
       {/* Footer */}
       <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600">
-        <p>© 2026 SkinGPT SaaS Skin Lab. All rights preserved.</p>
+        <p>© 2026 SkinGPT Skin Lab. All rights preserved.</p>
       </footer>
     </div>
   );

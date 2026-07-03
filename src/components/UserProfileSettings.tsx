@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Key, Eye, EyeOff, Check, AlertCircle, Save, Globe, CloudSun, Sliders, ShieldCheck, RefreshCw } from 'lucide-react';
+import { User, Mail, Key, Eye, EyeOff, Check, Save, Globe, CloudSun, Sliders, ShieldCheck } from 'lucide-react';
 import { UserProfile, SkinScan } from '../types';
 
 interface UserProfileSettingsProps {
@@ -17,14 +17,9 @@ export default function UserProfileSettings({ latestReport, onProfileChanged, cu
   const [skinType, setSkinType] = useState<UserProfile['skinType']>(currentProfile.skinType);
   const [selectedConcerns, setSelectedConcerns] = useState<string[]>(currentProfile.concerns);
   
-  const [geminiApiKey, setGeminiApiKey] = useState(currentProfile.geminiApiKey);
   const [openuvApiKey, setOpenuvApiKey] = useState(currentProfile.openuvApiKey);
 
-  const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showOpenuvKey, setShowOpenuvKey] = useState(false);
-
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
-  const [testErrorMessage, setTestErrorMessage] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
 
   // Synchronize with scan report if profile skin attributes are empty
@@ -57,7 +52,6 @@ export default function UserProfileSettings({ latestReport, onProfileChanged, cu
       climate,
       skinType,
       concerns: selectedConcerns,
-      geminiApiKey: geminiApiKey.trim(),
       openuvApiKey: openuvApiKey.trim()
     };
     onProfileChanged(updatedProfile);
@@ -65,37 +59,7 @@ export default function UserProfileSettings({ latestReport, onProfileChanged, cu
     setTimeout(() => setSaveStatus('idle'), 3000);
   };
 
-  const testGeminiConnection = async () => {
-    if (!geminiApiKey.trim()) {
-      setTestStatus('failed');
-      setTestErrorMessage('Please enter a Gemini API Key to test.');
-      return;
-    }
 
-    setTestStatus('testing');
-    setTestErrorMessage('');
-
-    try {
-      const response = await fetch('/api/test-gemini', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-gemini-key': geminiApiKey.trim()
-        }
-      });
-
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setTestStatus('success');
-      } else {
-        setTestStatus('failed');
-        setTestErrorMessage(data.error || 'Invalid API Key or connection failed.');
-      }
-    } catch (err: any) {
-      setTestStatus('failed');
-      setTestErrorMessage(err?.message || 'Network error testing key.');
-    }
-  };
 
   const allConcernsList = [
     "Acne",
@@ -318,69 +282,7 @@ export default function UserProfileSettings({ latestReport, onProfileChanged, cu
               We provide fully operational, pre-configured server-side integrations out-of-the-box. However, you can secure your own custom access credentials below.
             </p>
 
-            {/* Gemini API Key Block */}
-            <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-slate-800 dark:text-gray-200 uppercase tracking-wider block">Google Gemini API Key</span>
-                {geminiApiKey.trim() ? (
-                  <span className="px-2 py-0.5 bg-emerald-100 border border-emerald-200 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-bold">CUSTOM OVERRIDE</span>
-                ) : (
-                  <span className="px-2 py-0.5 bg-indigo-100 border border-indigo-200 dark:border-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded text-[9px] font-bold">BUILT-IN ACTIVE</span>
-                )}
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-gray-400 leading-relaxed">
-                By default, all skin scans and SkinGPT chat sessions use our platform's built-in Google Gemini API Key. To use your personal quota, paste your key below.
-              </p>
-              
-              <div className="relative">
-                <input
-                  type={showGeminiKey ? "text" : "password"}
-                  placeholder="AIzaSy..."
-                  value={geminiApiKey}
-                  onChange={e => setGeminiApiKey(e.target.value)}
-                  className="w-full pl-3 pr-10 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowGeminiKey(!showGeminiKey)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  {showGeminiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
 
-              {/* Test key connection button */}
-              <div className="flex items-center gap-2 pt-1.5">
-                <button
-                  type="button"
-                  disabled={testStatus === 'testing' || !geminiApiKey.trim()}
-                  onClick={testGeminiConnection}
-                  className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 disabled:opacity-50 text-[10px] font-bold border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-gray-300 transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  {testStatus === 'testing' ? (
-                    <>
-                      <RefreshCw className="h-3 w-3 animate-spin" />
-                      Testing key...
-                    </>
-                  ) : (
-                    "Test API Key Connection"
-                  )}
-                </button>
-
-                {testStatus === 'success' && (
-                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                    <Check className="h-3.5 w-3.5" />
-                    Key is functional!
-                  </span>
-                )}
-                {testStatus === 'failed' && (
-                  <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1" title={testErrorMessage}>
-                    <AlertCircle className="h-3.5 w-3.5" />
-                    Test failed
-                  </span>
-                )}
-              </div>
-            </div>
 
             {/* OpenUV API Key Block */}
             <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800">

@@ -13,7 +13,6 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   idToken: string | null;
-  googleAccessToken: string | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
@@ -29,27 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true);
   const [idToken, setIdToken] = useState<string | null>(null);
   
-  // Track googleAccessToken in sessionStorage for Google Drive sync
-  const [googleAccessToken, setGoogleAccessTokenState] = useState<string | null>(() => {
-    try {
-      return sessionStorage.getItem('skingpt_google_access_token');
-    } catch (e) {
-      return null;
-    }
-  });
 
-  const setGoogleAccessToken = (token: string | null) => {
-    setGoogleAccessTokenState(token);
-    try {
-      if (token) {
-        sessionStorage.setItem('skingpt_google_access_token', token);
-      } else {
-        sessionStorage.removeItem('skingpt_google_access_token');
-      }
-    } catch (e) {
-      console.error('Failed to set google access token in session storage', e);
-    }
-  };
 
   useEffect(() => {
     // onIdTokenChanged triggers on sign-in, sign-out, and token refresh events.
@@ -65,7 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         setIdToken(null);
-        setGoogleAccessToken(null);
       }
       setLoading(false);
     });
@@ -102,7 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await firebaseLogout();
       setUser(null);
       setIdToken(null);
-      setGoogleAccessToken(null);
     } finally {
       setLoading(false);
     }
@@ -113,9 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const result = await googleSignIn();
       if (result) {
-        setUser(result.user);
-        setGoogleAccessToken(result.accessToken);
-        const token = await result.user.getIdToken();
+        setUser(result);
+        const token = await result.getIdToken();
         setIdToken(token);
       }
     } catch (e) {
@@ -144,7 +120,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         idToken,
-        googleAccessToken,
         login,
         signup,
         logout,

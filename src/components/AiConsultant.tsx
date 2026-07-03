@@ -7,10 +7,9 @@ interface AiConsultantProps {
   latestReport: SkinScan | null;
   chatMessages: ChatMessage[];
   onChatMessagesChanged: (messages: ChatMessage[]) => void;
-  geminiApiKey: string;
 }
 
-export default function AiConsultant({ latestReport, chatMessages, onChatMessagesChanged, geminiApiKey }: AiConsultantProps) {
+export default function AiConsultant({ latestReport, chatMessages, onChatMessagesChanged }: AiConsultantProps) {
   const { idToken } = useAuth();
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -47,13 +46,15 @@ export default function AiConsultant({ latestReport, chatMessages, onChatMessage
     setInputText('');
     setIsLoading(true);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 30000); // 30 seconds client-side timeout
+
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json'
       };
-      if (geminiApiKey && geminiApiKey.trim()) {
-        headers['x-gemini-key'] = geminiApiKey.trim();
-      }
       if (idToken) {
         headers['Authorization'] = `Bearer ${idToken}`;
       }
@@ -64,8 +65,11 @@ export default function AiConsultant({ latestReport, chatMessages, onChatMessage
         body: JSON.stringify({
           messages: updatedMessages,
           currentReport: latestReport
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error('API server returned an error.');
@@ -81,12 +85,16 @@ export default function AiConsultant({ latestReport, chatMessages, onChatMessage
       };
 
       onChatMessagesChanged([...updatedMessages, assistantMessage]);
-    } catch (error) {
+    } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error(error);
+      const isTimeout = error.name === 'AbortError';
       const errorMessage: ChatMessage = {
         id: `msg-${Date.now() + 1}`,
         role: 'model',
-        text: "I apologize, but I had trouble establishing a secure connection with our skin science server. Please try again in a moment.",
+        text: isTimeout 
+          ? "I apologize, but the skin science server took longer than 30 seconds to respond. Please try your message again."
+          : "I apologize, but I had trouble establishing a secure connection with our skin science server. Please try again in a moment.",
         timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
       };
       onChatMessagesChanged([...updatedMessages, errorMessage]);

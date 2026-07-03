@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Calendar, Layers, BookOpen, MessageSquare, TrendingUp, Bell, Heart, Menu, X, Check, HelpCircle, User, Sun, Moon, Folder, LogOut, RefreshCw } from 'lucide-react';
+import { Sparkles, Calendar, Layers, BookOpen, MessageSquare, TrendingUp, Bell, Heart, Menu, X, Check, HelpCircle, User, Sun, Moon, LogOut, RefreshCw } from 'lucide-react';
 import { SkinScan, CabinetItem, ChatMessage, UserProfile } from './types';
 import Dashboard from './components/Dashboard';
 import SkinScanner from './components/SkinScanner';
@@ -10,7 +10,6 @@ import History from './components/History';
 import UserProfileSettings from './components/UserProfileSettings';
 import UserGuide from './components/UserGuide';
 import Testimonials from './components/Testimonials';
-import GoogleDrive from './components/GoogleDrive';
 import { useAuth } from './hooks/useAuth';
 import LandingAuth from './pages/LandingAuth';
 import { 
@@ -34,7 +33,7 @@ export default function App() {
   const { user, loading, logout } = useAuth();
   const [currentTab, setCurrentTab] = useState('dashboard');
 
-  const [importedImage, setImportedImage] = useState<string | null>(null);
+
   const [latestReport, setLatestReport] = useState<SkinScan | null>(null);
   const [cabinetItems, setCabinetItems] = useState<CabinetItem[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -77,7 +76,6 @@ export default function App() {
     climate: 'Temperate',
     skinType: 'Normal',
     concerns: [],
-    geminiApiKey: '',
     openuvApiKey: ''
   });
 
@@ -117,11 +115,10 @@ export default function App() {
               climate: 'Temperate',
               skinType: 'Normal',
               concerns: [],
-              geminiApiKey: '',
               openuvApiKey: ''
             };
           }
-          // Add SaaS fields
+          // Add profile metadata fields
           newProfile.uid = user.uid;
           newProfile.displayName = user.displayName || newProfile.name;
           newProfile.photoURL = user.photoURL || '';
@@ -361,7 +358,6 @@ export default function App() {
               { id: 'ingredients', label: 'Ingredient Wiki', icon: <BookOpen className="h-4 w-4" /> },
               { id: 'consultant', label: 'AI Coach SkinGPT', icon: <MessageSquare className="h-4 w-4" /> },
               { id: 'history', label: 'Timeline & History', icon: <TrendingUp className="h-4 w-4" /> },
-              { id: 'drive', label: 'Google Drive', icon: <Folder className="h-4 w-4" /> },
               { id: 'guide', label: 'User Guide', icon: <HelpCircle className="h-4 w-4" /> },
               { id: 'testimonials', label: 'Testimonials', icon: <Heart className="h-4 w-4" /> },
               { id: 'profile', label: 'Profile & Keys', icon: <User className="h-4 w-4" /> }
@@ -451,9 +447,6 @@ export default function App() {
                 <span className="text-xs font-bold text-brand-950 dark:text-gray-200 block leading-tight truncate max-w-[110px]">
                   {userProfile.name || 'Guest User'}
                 </span>
-                <span className="text-[10px] text-gray-400 dark:text-gray-500 block leading-none">
-                  {userProfile.geminiApiKey ? 'Custom API Key' : 'Built-in API'}
-                </span>
               </div>
             </button>
 
@@ -494,7 +487,6 @@ export default function App() {
                 { id: 'ingredients', label: 'Ingredient Wiki', icon: <BookOpen className="h-4 w-4" /> },
                 { id: 'consultant', label: 'AI Coach SkinGPT', icon: <MessageSquare className="h-4 w-4" /> },
                 { id: 'history', label: 'Timeline & History', icon: <TrendingUp className="h-4 w-4" /> },
-                { id: 'drive', label: 'Google Drive', icon: <Folder className="h-4 w-4" /> },
                 { id: 'guide', label: 'User Guide', icon: <HelpCircle className="h-4 w-4" /> },
                 { id: 'testimonials', label: 'Testimonials', icon: <Heart className="h-4 w-4" /> },
                 { id: 'profile', label: 'Profile & Keys', icon: <User className="h-4 w-4" /> }
@@ -531,18 +523,6 @@ export default function App() {
         {currentTab === 'scan' && (
           <SkinScanner
             onScanCompleted={handleScanCompleted}
-            geminiApiKey={userProfile.geminiApiKey}
-            importedImage={importedImage}
-            onClearImportedImage={() => setImportedImage(null)}
-          />
-        )}
-
-        {currentTab === 'drive' && (
-          <GoogleDrive
-            latestReport={latestReport}
-            userProfile={userProfile}
-            onImportImageForScan={(base64Url) => setImportedImage(base64Url)}
-            onNavigateToTab={handleNavigate}
           />
         )}
 
@@ -562,7 +542,6 @@ export default function App() {
             latestReport={latestReport}
             chatMessages={chatMessages}
             onChatMessagesChanged={handleChatMessagesChanged}
-            geminiApiKey={userProfile.geminiApiKey}
           />
         )}
 

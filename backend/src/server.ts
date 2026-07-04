@@ -36,18 +36,27 @@ async function startServer() {
   app.use(helmet());
 
   // Configure strict CORS origins
+  console.log("FRONTEND_URL =", process.env.FRONTEND_URL);
   const allowedOrigins = [
-    process.env.FRONTEND_URL || 'https://skingpt.vercel.app',
-    'http://localhost:5173'
+    "https://skingpt-app.vercel.app",
+    "https://skingpt.vercel.app",
+    "http://localhost:5173"
   ];
+
+  if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+  }
+
+  console.log("Allowed Origins:", allowedOrigins);
 
   app.use(cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, postman)
+      console.log("Incoming Origin:", origin);
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        console.log("Blocked Origin:", origin);
+        callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
@@ -78,7 +87,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
   // Basic health endpoint
-  app.get('/health', (req, res) => {
+  app.get('/api/health', (req, res) => {
     res.json({
       status: 'ok',
       uptime: Math.floor(process.uptime()),
